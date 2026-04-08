@@ -1,12 +1,289 @@
 #include <iostream>
-#include <corecrt_math_defines.h>
+#include <ios>
 #include <memory>
 #include <map>
 #include <sstream>
+#include <cstdarg>
 #include <string>
 #include <iomanip>
 #include <typeinfo>
 
+#include <cstdio>
+
+#include <Windows.h>
+#include <gl/GL.h>
+
+#pragma comment(lib, "opengl32.lib")
+
+constexpr double Pi = 3.1415926535897932384626433832795;
+
+void RunShapeDemo();
+namespace
+{
+    HGLRC g_hGLRC = nullptr;
+
+    void CreateDebugConsole()
+    {
+        if (!AllocConsole())
+            return;
+
+        FILE* fp = nullptr;
+        freopen_s(&fp, "CONOUT$", "w", stdout);
+        freopen_s(&fp, "CONOUT$", "w", stderr);
+        freopen_s(&fp, "CONIN$", "r", stdin);
+
+        std::ios::sync_with_stdio(true);
+
+        std::cout.clear();
+        std::cerr.clear();
+        std::cin.clear();
+
+        SetConsoleOutputCP(CP_UTF8);
+        SetConsoleCP(CP_UTF8);
+
+        std::wcout.clear();
+        std::wcerr.clear();
+        std::wcin.clear();
+    }
+
+    bool SetupPixelFormat(HDC hdc)
+    {
+        PIXELFORMATDESCRIPTOR pfd{};
+        pfd.nSize = sizeof(PIXELFORMATDESCRIPTOR);
+        pfd.nVersion = 1;
+        pfd.dwFlags = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER;
+        pfd.iPixelType = PFD_TYPE_RGBA;
+        pfd.cColorBits = 32;
+        pfd.cDepthBits = 24;
+        pfd.cStencilBits = 8;
+        pfd.iLayerType = PFD_MAIN_PLANE;
+
+        const int pixelFormat = ChoosePixelFormat(hdc, &pfd);
+        if (pixelFormat == 0)
+            return false;
+
+        if (!SetPixelFormat(hdc, pixelFormat, &pfd))
+            return false;
+
+        return true;
+    }
+
+    LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
+    {
+        switch (msg)
+        {
+        case WM_SIZE:
+        {
+            const int width = LOWORD(lParam);
+            const int height = HIWORD(lParam);
+
+            if (height > 0)
+            {
+                const double aspect = static_cast<double>(width) / static_cast<double>(height);
+
+                glViewport(0, 0, width, height);
+
+                glMatrixMode(GL_PROJECTION);
+                glLoadIdentity();
+
+                const double zNear = 1.0;
+                const double zFar = 100.0;
+                const double fovY = 45.0;
+                const double top = zNear * tan(fovY * Pi / 360.0);
+                const double bottom = -top;
+                const double right = top * aspect;
+                const double left = -right;
+
+                glFrustum(left, right, bottom, top, zNear, zFar);
+
+                glMatrixMode(GL_MODELVIEW);
+            }
+            return 0;
+        }
+
+        case WM_PAINT:
+        {
+            PAINTSTRUCT ps{};
+            HDC hdc = BeginPaint(hwnd, &ps);
+
+            glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            SwapBuffers(hdc);
+
+            EndPaint(hwnd, &ps);
+            return 0;
+        }
+
+        case WM_CLOSE:
+            DestroyWindow(hwnd);
+            return 0;
+
+        case WM_DESTROY:
+            if (g_hGLRC != nullptr)
+            {
+                wglMakeCurrent(nullptr, nullptr);
+                wglDeleteContext(g_hGLRC);
+                g_hGLRC = nullptr;
+            }
+
+            PostQuitMessage(0);
+            return 0;
+        }
+
+        return DefWindowProc(hwnd, msg, wParam, lParam);
+    }
+}
+void DrawCube()
+{
+    glBegin(GL_QUADS);
+
+    // Front
+    glColor3f(1.0f, 0.0f, 0.0f);
+    glVertex3f(-1.0f, -1.0f, 1.0f);
+    glVertex3f(1.0f, -1.0f, 1.0f);
+    glVertex3f(1.0f, 1.0f, 1.0f);
+    glVertex3f(-1.0f, 1.0f, 1.0f);
+
+    // Back
+    glColor3f(0.0f, 1.0f, 0.0f);
+    glVertex3f(1.0f, -1.0f, -1.0f);
+    glVertex3f(-1.0f, -1.0f, -1.0f);
+    glVertex3f(-1.0f, 1.0f, -1.0f);
+    glVertex3f(1.0f, 1.0f, -1.0f);
+
+    // Left
+    glColor3f(0.0f, 0.0f, 1.0f);
+    glVertex3f(-1.0f, -1.0f, -1.0f);
+    glVertex3f(-1.0f, -1.0f, 1.0f);
+    glVertex3f(-1.0f, 1.0f, 1.0f);
+    glVertex3f(-1.0f, 1.0f, -1.0f);
+
+    // Right
+    glColor3f(1.0f, 1.0f, 0.0f);
+    glVertex3f(1.0f, -1.0f, 1.0f);
+    glVertex3f(1.0f, -1.0f, -1.0f);
+    glVertex3f(1.0f, 1.0f, -1.0f);
+    glVertex3f(1.0f, 1.0f, 1.0f);
+
+    // Top
+    glColor3f(1.0f, 0.0f, 1.0f);
+    glVertex3f(-1.0f, 1.0f, 1.0f);
+    glVertex3f(1.0f, 1.0f, 1.0f);
+    glVertex3f(1.0f, 1.0f, -1.0f);
+    glVertex3f(-1.0f, 1.0f, -1.0f);
+
+    // Bottom
+    glColor3f(0.0f, 1.0f, 1.0f);
+    glVertex3f(-1.0f, -1.0f, -1.0f);
+    glVertex3f(1.0f, -1.0f, -1.0f);
+    glVertex3f(1.0f, -1.0f, 1.0f);
+    glVertex3f(-1.0f, -1.0f, 1.0f);
+
+    glEnd();
+}
+void RenderFrame(HDC hdc)
+{
+    static float angle = 0.0f;
+    angle += 0.3f;
+
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+
+    glTranslatef(0.0f, 0.0f, -6.0f);
+    glRotatef(angle, 30.0f, 45.0f, 0.0f);
+
+    DrawCube();
+
+    SwapBuffers(hdc);
+}
+
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
+{
+    CreateDebugConsole();
+    std::cout << "Console attached.\n";
+    RunShapeDemo();
+    const wchar_t kClassName[] = L"OpenGLBlackWindowClass";
+
+    WNDCLASSW wc{};
+    wc.style = CS_OWNDC;
+    wc.lpfnWndProc = WindowProc;
+    wc.hInstance = hInstance;
+    wc.lpszClassName = kClassName;
+    wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
+
+    if (!RegisterClassW(&wc))
+        return -1;
+
+    HWND hwnd = CreateWindowExW(
+        0,
+        kClassName,
+        L"OpenGL Black Window",
+        WS_OVERLAPPEDWINDOW,
+        CW_USEDEFAULT,
+        CW_USEDEFAULT,
+        800,
+        600,
+        nullptr,
+        nullptr,
+        hInstance,
+        nullptr
+    );
+
+    if (hwnd == nullptr)
+        return -2;
+
+    HDC hdc = GetDC(hwnd);
+    if (hdc == nullptr)
+        return -3;
+
+    if (!SetupPixelFormat(hdc))
+    {
+        ReleaseDC(hwnd, hdc);
+        return -4;
+    }
+
+    g_hGLRC = wglCreateContext(hdc);
+    if (g_hGLRC == nullptr)
+    {
+        ReleaseDC(hwnd, hdc);
+        return -5;
+    }
+
+    if (!wglMakeCurrent(hdc, g_hGLRC))
+    {
+        wglDeleteContext(g_hGLRC);
+        g_hGLRC = nullptr;
+        ReleaseDC(hwnd, hdc);
+        return -6;
+    }
+    glEnable(GL_DEPTH_TEST);
+    ShowWindow(hwnd, nCmdShow);
+    UpdateWindow(hwnd);
+
+    MSG msg{};
+    while (true)
+    {
+        if (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE))
+        {
+            if (msg.message == WM_QUIT)
+                break;
+
+            TranslateMessage(&msg);
+            DispatchMessageW(&msg);
+        }
+        else
+        {
+            RenderFrame(hdc);
+        }
+    }
+
+    ReleaseDC(hwnd, hdc);
+    FreeConsole();
+    return static_cast<int>(msg.wParam);
+}
 struct TableRow
 {
     const void* address = nullptr;
@@ -43,16 +320,16 @@ private:
     double _area = 0.;
 };
 
-class Rectangle : public ShapeChild
+class RectangleMy : public ShapeChild
 {
 public:
-    Rectangle(double width, double height)
+    RectangleMy(double width, double height)
         : ShapeChild(width* height)
     {
     }
-    static std::unique_ptr<Rectangle> create(double width, double height)
+    static std::unique_ptr<RectangleMy> create(double width, double height)
     {
-        return std::make_unique<Rectangle>(width, height);
+        return std::make_unique<RectangleMy>(width, height);
     }
     void draw() const override
     {
@@ -64,7 +341,7 @@ class Circle : public ShapeChild
 {
 public:
     Circle(double radius)
-        : ShapeChild(radius * radius * M_PI)
+        : ShapeChild(radius * radius * Pi)
     {
     }
     static std::unique_ptr<Circle> create(double radius)
@@ -77,7 +354,7 @@ public:
     }
 };
 
-void printShape(const Shape& shape)
+static void printShape(const Shape& shape)
 {
     shape.draw();
     std::cout << "area from printShape: " << shape.area() << '\n';
@@ -132,7 +409,7 @@ void emplaceToTable(const std::unique_ptr<T>& ptr, const std::string& name, std:
 }
 
 
-void printTable(const std::map<std::string, TableRow>& tableOfAddresses)
+static void printTable(const std::map<std::string, TableRow>& tableOfAddresses)
 {
     constexpr int nameWidth = 34;
     constexpr int addrWidth = 28;
@@ -164,7 +441,7 @@ void printTable(const std::map<std::string, TableRow>& tableOfAddresses)
     }
 }
 
-int main()
+void RunShapeDemo()
 {
     std::map <std::string, TableRow> tableOfAdreses;
     ShapeChild shch{ 5.456 };  // создаём объект производного класса ShapeChild
@@ -219,7 +496,7 @@ int main()
         std::cout << "downcast offset: " << std::hex << std::showbase << offset << '\n';
     }
 
-    Rectangle rect{ 10, 20 };
+    RectangleMy rect{ 10, 20 };
     emplaceToTable(rect, "Rectangle rect", tableOfAdreses);
     rect.draw();
 
@@ -234,11 +511,10 @@ int main()
 
     auto circle2 = Circle::create(22.);
     emplaceToTable(circle2, "auto circle2", tableOfAdreses);
-    auto rect2 = Rectangle::create(2., 3.);
+    auto rect2 = RectangleMy::create(2., 3.);
     emplaceToTable(rect2, "auto rect2", tableOfAdreses);
     printShape(*rect2);
     printShape(*circle2);
 
     printTable(tableOfAdreses);
-    return 0;
 }
