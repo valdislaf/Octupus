@@ -133,6 +133,7 @@ namespace
         return DefWindowProc(hwnd, msg, wParam, lParam);
     }
 }
+
 static void DrawCube()
 {
     glBegin(GL_QUADS);
@@ -181,6 +182,7 @@ static void DrawCube()
 
     glEnd();
 }
+
 static void RenderFrame(HDC hdc)
 {
     static float angle = 0.0f;
