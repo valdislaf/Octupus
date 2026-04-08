@@ -7,9 +7,9 @@
 #include <string>
 #include <iomanip>
 #include <typeinfo>
-
+#include <cmath>
 #include <cstdio>
-
+#include <sal.h>
 #include <Windows.h>
 #include <gl/GL.h>
 
@@ -133,7 +133,7 @@ namespace
         return DefWindowProc(hwnd, msg, wParam, lParam);
     }
 }
-void DrawCube()
+static void DrawCube()
 {
     glBegin(GL_QUADS);
 
@@ -181,7 +181,7 @@ void DrawCube()
 
     glEnd();
 }
-void RenderFrame(HDC hdc)
+static void RenderFrame(HDC hdc)
 {
     static float angle = 0.0f;
     angle += 0.3f;
@@ -200,7 +200,7 @@ void RenderFrame(HDC hdc)
     SwapBuffers(hdc);
 }
 
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
+int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ int nCmdShow)
 {
     CreateDebugConsole();
     std::cout << "Console attached.\n";
