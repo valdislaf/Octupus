@@ -12,6 +12,9 @@
 #include <sal.h>
 #include <Windows.h>
 #include <gl/GL.h>
+#include <cstddef>
+#include <bitset>
+#include <iostream>
 
 #pragma comment(lib, "opengl32.lib")
 
@@ -180,6 +183,13 @@ static void DrawCube()
     glVertex3f(1.0f, -1.0f, 1.0f);
     glVertex3f(-1.0f, -1.0f, 1.0f);
 
+    // low
+    glColor3f(10.0f, 1.0f, 1.0f);
+    glVertex3f(-11.0f, -1.0f, -1.0f);
+    glVertex3f(11.0f, -1.0f, -1.0f);
+    glVertex3f(11.0f, -1.0f, 1.0f);
+    glVertex3f(-11.0f, -1.0f, 1.0f);
+
     glEnd();
 }
 
@@ -205,6 +215,43 @@ static void RenderFrame(HDC hdc)
 int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ int nCmdShow)
 {
     CreateDebugConsole();
+
+    unsigned char flags{ 7 }; // 0000 0111
+    auto isByte1 = static_cast<bool>(flags & 0x01); // true
+    auto Byte1 = static_cast<int>(flags & 0x01);    // 1
+    //    0000 0111  // flags
+    //    0000 0001  // маска 0x01
+    //    -------- -
+    //    0000 0001  // результат = 1
+    auto isByte3 = static_cast<bool>(flags & 0x03); // true
+    auto Byte3 = static_cast<int>(flags & 0x03);    // 3
+    //    0000 0111  // flags
+    //    0000 0011  // маска
+    //    -------- -
+    //    0000 0011  // результат = 3
+    auto isByte7 = static_cast<bool>(flags & 0x07); // true
+    auto Byte7 = static_cast<int>(flags & 0x07);    // 7
+    //    0000 0111
+    //    0000 0111
+    //    -------- -
+    //    0000 0111 = 7
+    auto isByte8 = static_cast<bool>(flags & 0x08); // false
+    auto Byte8 = static_cast<int>(flags & 0x08);    // 0
+    //    0000 0111  // flags
+    //    0000 1000  // маска
+    //    -------- -
+    //    0000 0000  // результат = 0
+    auto isByte10 = static_cast<bool>(flags & 0x0A); // true
+    auto Byte10 = static_cast<int>(flags & 0x0A);    // 2
+    //    0000 0111  // flags
+    //    0000 1010  // маска
+    //    -------- -
+    //    0000 0010  // результат = 2
+    std::wstringstream ws;
+    ws << static_cast<int>(flags) << " // " << std::bitset<8>{flags} << std::endl;
+    std::wcout << ws.str();
+
+    
     std::cout << "Console attached.\n";
     RunShapeDemo();
     const wchar_t kClassName[] = L"OpenGLBlackWindowClass";
